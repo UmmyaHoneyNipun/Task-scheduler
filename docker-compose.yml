@@ -26,5 +26,38 @@ services:
       postgres:
         condition: service_healthy
 
+  worker-alpha:
+    build: .
+    container_name: otee-worker-alpha
+    command: python -m scheduler.worker --api-url http://api:8000
+    environment:
+      PYTHONUNBUFFERED: "1"
+      DATABASE_URL: postgresql://otee_admin:otee_password@postgres:5432/task_scheduler
+    depends_on:
+      api:
+        condition: service_started
+
+  worker-beta:
+    build: .
+    container_name: otee-worker-beta
+    command: python -m scheduler.worker --api-url http://api:8000
+    environment:
+      PYTHONUNBUFFERED: "1"
+      DATABASE_URL: postgresql://otee_admin:otee_password@postgres:5432/task_scheduler
+    depends_on:
+      api:
+        condition: service_started
+
+  sweeper:
+    build: .
+    container_name: otee-scheduler-sweeper
+    command: python -m scheduler.sweeper
+    environment:
+      PYTHONUNBUFFERED: "1"
+      DATABASE_URL: postgresql://otee_admin:otee_password@postgres:5432/task_scheduler
+    depends_on:
+      api:
+        condition: service_started
+
 volumes:
   postgres_data:
