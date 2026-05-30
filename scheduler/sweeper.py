@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timedelta, UTC
 
 from scheduler.config import settings
-from scheduler.database import SessionLocal
+from scheduler.database import Base, SessionLocal, engine
 from scheduler.models import Job
 
 logging.basicConfig(level=logging.INFO, format='{"timestamp": "%(asctime)s", "level": "%(levelname)s", "message": "%(message)s"}')
@@ -11,6 +11,7 @@ logger = logging.getLogger("sweeper")
 
 def run_timeout_sweeper():
     logger.info("Starting Worker Timeout Sweeper...")
+    Base.metadata.create_all(bind=engine)
     while True:
         db = SessionLocal()
         try:
@@ -34,6 +35,7 @@ def run_timeout_sweeper():
                     logger.info(f"Job {job.id} reset back to PENDING. Retry: {job.retry_count}")
                 else:
                     job.status = "FAILED"
+                    job.worker_id = None
                     job.error_message = "Execution timed out and exceeded retry limits."
                     logger.error(f"Job {job.id} marked FAILED. All retries exhausted.")
                 
