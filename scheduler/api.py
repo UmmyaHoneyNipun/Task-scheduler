@@ -23,19 +23,23 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title=settings.APP_NAME, version="1.0.0", lifespan=lifespan)
 
+
 class JobCreate(BaseModel):
-    job_type: str = Field(..., example="http")
-    payload: Dict[str, Any] = Field(..., example={"url": "https://someurl.org/get", "method": "GET"})
+    job_type: str = Field(..., json_schema_extra={"example": "http"})
+    payload: Dict[str, Any] = Field(
+        ...,
+        json_schema_extra={"example": {"url": "https://someurl.org/get", "method": "GET"}},
+    )
     priority: int = Field(1, ge=1, le=10)
     max_retries: int = Field(1, ge=0)
 
 
 class WorkerRequest(BaseModel):
-    worker_id: str = Field(..., min_length=1, example="worker-alpha")
+    worker_id: str = Field(..., min_length=1, json_schema_extra={"example": "worker-alpha"})
 
 
 class JobFailureRequest(WorkerRequest):
-    error_message: str = Field(..., min_length=1, example="Request timed out")
+    error_message: str = Field(..., min_length=1, json_schema_extra={"example": "Request timed out"})
 
 
 def get_running_job_for_worker(id: str, worker_id: str, db: Session) -> Job:
@@ -119,9 +123,19 @@ def get_next_job(worker: WorkerRequest, db: Session = Depends(get_db)):
 
 @app.post("/jobs/{id}/complete")
 def complete_job(id: str, worker: WorkerRequest, db: Session = Depends(get_db)):
-    job = get_running_job_for_worker(id, worker.worker_id, db)
+    job = db.query(Job).filter(Job.id == id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job.status == "COMPLETED" and job.worker_id == worker.worker_id:
+        return {"status": "success", "id": id}
+
+    if job.status != "RUNNING":
+        raise HTTPException(status_code=400, detail="Only running jobs can be completed")
+    if job.worker_id != worker.worker_id:
+        raise HTTPException(status_code=403, detail="Job is owned by a different worker")
+
     job.status = "COMPLETED"
-    job.worker_id = None
     job.updated_at = datetime.now(UTC)
     db.commit()
     logger.info(f"Job completed: {id}")
@@ -141,6 +155,7 @@ def fail_job(id: str, failure: JobFailureRequest, db: Session = Depends(get_db))
         logger.warning(f"Rescheduling Job {id} for retry {job.retry_count}/{job.max_retries}")
     else:
         job.status = "FAILED"
+        job.worker_id = None
         job.error_message = err_msg
         logger.error(f"Job {id} completely failed. Error: {err_msg}")
 
