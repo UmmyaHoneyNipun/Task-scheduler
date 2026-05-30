@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: otee-postgres
+    environment:
+      POSTGRES_USER: otee_admin
+      POSTGRES_PASSWORD: otee_password
+      POSTGRES_DB: task_scheduler
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U otee_admin -d task_scheduler"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    container_name: otee-scheduler-api
+    ports:
+      - "8001:8000"
+    environment:
+      PYTHONUNBUFFERED: "1"
+      DATABASE_URL: postgresql://otee_admin:otee_password@postgres:5432/task_scheduler
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
