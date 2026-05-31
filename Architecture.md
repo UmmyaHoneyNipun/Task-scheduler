@@ -1,40 +1,64 @@
 ## Architecture and Design Choices
 
-The design is intentionally simple. I wanted to keep the solution focused on the actual assignment requirements instead of adding extra tools that would make the project harder to run.
+The design is intentionally small and practical. I wanted the project to be easy to reason about, easy to run locally, and still clear about the core responsibilities: queueing work, executing it with multiple workers, and recovering from worker failures.
 
 ### Architecture
 
-The project is split into a few clear parts:
+The project is split into a few focused parts:
 
-- `scheduler/api.py` is the main scheduler and API layer. It is responsible for creating jobs, returning job status, and giving workers the next available job.
-- `scheduler/models.py` and `scheduler/database.py` define the job model and database connection. PostgreSQL is used as the single source of truth for job state.
-- `scheduler/worker.py` contains the worker logic. Workers continuously poll the API, execute jobs, and report whether the job completed or failed.
-- `scheduler/sweeper.py` handles jobs that get stuck in the `RUNNING` state for too long. If a worker crashes or never reports back, the sweeper can either requeue the job or mark it as failed.
+- `scheduler/api.py` owns job creation and state transitions. It writes durable job records to PostgreSQL and pushes new work into Redis queues.
+- `scheduler/models.py` and `scheduler/database.py` define the job schema and database session management. PostgreSQL is the durable source of truth for job state and retry history.
+- `scheduler/redis_queue.py` centralizes the Redis queue names, message format, heartbeat keys, and processing-list helpers so the worker and sweeper follow the same protocol.
+- `scheduler/worker.py` asks the API for the next job, executes the work, and reports completion or failure.
+- `scheduler/sweeper.py` watches for timed-out `RUNNING` jobs. If a worker stops heartbeating, the sweeper requeues the job when retries are still available or marks it as failed when the retry budget is exhausted.
 
-One important part of the design is how workers claim jobs. Workers take jobs in priority order, and PostgreSQL row locking is used to make sure two workers do not pick the same job at the same time.
+### Queue Flow
 
-For example, if Worker A claims a job, that job row is locked while it is being selected. If Worker B asks for a job at the same moment, PostgreSQL skips the locked row and gives Worker B the next available job instead. This keeps the worker logic simple and avoids duplicate processing.
+The runtime flow looks like this:
 
-### Why I Did Not Use Kafka, NATS, Redis, Grafana, or Prometheus
+1. A client creates a job through the API.
+2. The API saves the job in PostgreSQL with status `PENDING`.
+3. The API serializes the job metadata and pushes it into the correct Redis queue.
+4. A worker calls `POST /next-job`, and the API atomically moves one job into that worker's processing list while marking it `RUNNING`.
+5. While the job is running, the worker updates a Redis heartbeat key.
+6. On success, the worker calls the API to mark the job `COMPLETED`.
+7. On failure, the worker calls the API to update retry state. The worker or sweeper requeues the job when retries remain.
 
-I avoided Kafka or NATS because they would make the project bigger than needed. The assignment can be solved clearly with PostgreSQL, so I kept the design simple and focused on the scheduler logic.
+This split keeps durability in PostgreSQL and fast queue operations in Redis.
 
-I also did not use Redis. Redis would work well for a fast queue or distributed lock, but the assignment requires persistent job state, retries, and status tracking. PostgreSQL already handles those requirements well, so using Redis would add another moving part without much benefit for this scope.
+### Why I Did Not Use Kafka, NATS, Grafana, or Prometheus
 
-I removed Grafana and Prometheus as well. Monitoring is important in a real production system, but for this assignment I wanted the project to stay focused on the scheduler itself: job creation, job claiming, retries, worker execution, and timeout handling. I implemented those just to checkpout how it works, added a image which demonstrate how the Task Scheduler works. it was the better way to test .
+I did not use Kafka or NATS because they would make the solution much heavier than it needed to be. They are strong choices for high-throughput event systems, but this project only needs a small queue with retries and worker recovery.
+
+I also removed Grafana and Prometheus from the final version. They are useful for observability, but they are not needed to demonstrate the scheduler logic itself. Leaving them out keeps the submission focused on the actual scheduling behavior instead of the monitoring layer.
+
+### Why Redis Was a Good Fit Here
+
+Redis is a good middle ground for this version of the project:
+
+- it gives fast queue operations
+- it supports worker processing lists naturally
+- it makes heartbeats and timeout tracking simple
+- it keeps the worker flow easy to follow
+
+PostgreSQL still keeps the durable job record, so Redis is used for coordination rather than long-term storage.
 
 ### Could Those Tools Be Used?
 
-Yes. I chose a smaller and more direct design that solves the assignment requirements first. Extra production tools can be added later, but they are not necessary to prove that the scheduler works correctly.
+Yes.
+
+- Kafka or NATS could carry jobs as messages instead of Redis lists.
+- Grafana and Prometheus could be added later for metrics and dashboards.
+- Redis Streams could also be a natural evolution if the project needed richer delivery semantics.
+
+For this assignment, I preferred a smaller design that is easier to explain and easier to verify.
 
 ### Why I Used SQLite in Unit Tests
 
-The application is designed to run with PostgreSQL, but I used SQLite for the unit tests because it keeps the test environment lightweight.
+The application runs with PostgreSQL in the real stack, but I used SQLite in the unit tests to keep the test environment lightweight.
 
 Unit tests should be quick and easy to run. I did not want someone to need Docker or a running PostgreSQL instance just to check the basic logic of the project.
 
-In these tests, I am mainly checking things like job creation, status changes, retry handling, and timeout logic. Those parts do not require PostgreSQL-specific features.
+In these tests, I am mainly checking things like job creation, state transitions, retry handling, queue cleanup, and worker execution behavior. Those cases do not need PostgreSQL-specific locking.
 
-PostgreSQL is still the right choice for the actual scheduler because it gives us row-level locking and `SKIP LOCKED`, which are important when multiple workers try to claim jobs at the same time.
-
-So SQLite is used only to make local testing simple. The Development behavior that depends on PostgreSQL locking would be covered separately with integration tests.
+So SQLite is only there to keep local unit testing simple, while PostgreSQL remains the correct runtime database for the actual scheduler stack.

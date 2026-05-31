@@ -15,6 +15,19 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+  redis:
+    image: redis:7-alpine
+    container_name: otee-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   api:
     build: .
@@ -24,43 +37,58 @@ services:
     environment:
       PYTHONUNBUFFERED: "1"
       DATABASE_URL: postgresql://otee_admin:otee_password@postgres:5432/task_scheduler
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   worker-alpha:
     build: .
     container_name: otee-worker-alpha
-    command: python -m scheduler.worker --api-url http://api:8000
+    command: python -m scheduler.worker --api-url http://api:8000 --redis-url redis://redis:6379/0
     environment:
       PYTHONUNBUFFERED: "1"
       WORKER_ID: worker-alpha
       DATABASE_URL: postgresql://otee_admin:otee_password@postgres:5432/task_scheduler
+      SCHEDULER_API_URL: http://api:8000
+      REDIS_URL: redis://redis:6379/0
     depends_on:
+      redis:
+        condition: service_healthy
       api:
         condition: service_started
 
   worker-beta:
     build: .
     container_name: otee-worker-beta
-    command: python -m scheduler.worker --api-url http://api:8000
+    command: python -m scheduler.worker --api-url http://api:8000 --redis-url redis://redis:6379/0
     environment:
       PYTHONUNBUFFERED: "1"
       WORKER_ID: worker-beta
       DATABASE_URL: postgresql://otee_admin:otee_password@postgres:5432/task_scheduler
+      SCHEDULER_API_URL: http://api:8000
+      REDIS_URL: redis://redis:6379/0
     depends_on:
+      redis:
+        condition: service_healthy
       api:
         condition: service_started
 
   worker-gamma:
     build: .
     container_name: otee-worker-gamma
-    command: python -m scheduler.worker --api-url http://api:8000
+    command: python -m scheduler.worker --api-url http://api:8000 --redis-url redis://redis:6379/0
     environment:
       PYTHONUNBUFFERED: "1"
       WORKER_ID: worker-gamma
       DATABASE_URL: postgresql://otee_admin:otee_password@postgres:5432/task_scheduler
+      SCHEDULER_API_URL: http://api:8000
+      REDIS_URL: redis://redis:6379/0
     depends_on:
+      redis:
+        condition: service_healthy
       api:
         condition: service_started
 
@@ -71,9 +99,12 @@ services:
     environment:
       PYTHONUNBUFFERED: "1"
       DATABASE_URL: postgresql://otee_admin:otee_password@postgres:5432/task_scheduler
+      REDIS_URL: redis://redis:6379/0
     depends_on:
-      api:
-        condition: service_started
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
 
   test:
     build:
@@ -87,3 +118,4 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:

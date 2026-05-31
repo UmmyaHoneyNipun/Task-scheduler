@@ -1,31 +1,47 @@
 # OTEE Task Scheduler
 
-Simple distributed task scheduler built with FastAPI, PostgreSQL, and Docker Compose.
+Simple distributed task scheduler built with FastAPI, PostgreSQL, Redis, and Docker Compose.
 
 ## Current stack
 - Python
 - FastAPI
 - PostgreSQL
+- Redis
 - Docker Compose for local development
 
 ## What is in the project
 
-- An API for creating and managing scheduled tasks according to priority (1-10 where 10 means highest and 1 lowest)
-- Worker processes that claim and execute tasks
+- An API for creating and tracking scheduled jobs
+- Redis-backed worker queues with three worker processes
 - A timeout sweeper that requeues or fails stalled jobs
-- Unit tests for job creation, execution, and worker behavior
+- Unit tests for job creation, worker execution, and retry behavior
 
-## Swagger UI
-docker compose up -d --build
-http://localhost:8001/docs
+## Run the stack
+
+```bash
+docker compose up --build
+```
+
+This starts:
+- PostgreSQL
+- Redis
+- the API
+- three workers
+- the timeout sweeper
+- the unit-test container
 
 ## Run the unit tests
+
+```bash
 pytest -q tests/test_scheduler.py
+```
 
-## Run the stack and unit tests together
-docker compose up --build
+## Swagger UI
 
-The `test` service runs the unit suite automatically as part of the default Compose stack.
+[http://localhost:8001/docs](http://localhost:8001/docs)
 
-## Watch the log
+## Watch the logs
+
+```bash
 docker compose logs -f
+```
