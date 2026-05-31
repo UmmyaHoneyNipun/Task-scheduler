@@ -26,11 +26,21 @@ The runtime flow looks like this:
 
 This split keeps durability in PostgreSQL and fast queue operations in Redis.
 
-### Why I Did Not Use Kafka, NATS, Grafana, or Prometheus
+### Why I Did Not Use Kafka or NATS
 
 I did not use Kafka or NATS because they would make the solution much heavier than it needed to be. They are strong choices for high-throughput event systems, but this project only needs a small queue with retries and worker recovery.
 
-I also removed Grafana and Prometheus from the final version. They are useful for observability, but they are not needed to demonstrate the scheduler logic itself. Leaving them out keeps the submission focused on the actual scheduling behavior instead of the monitoring layer.
+### Why Grafana and Prometheus Are Optional Here
+
+I added Grafana and Prometheus for visibility while testing the scheduler, not because the queue itself depends on them.
+
+They help answer questions like:
+
+- how many jobs are pending right now
+- which workers are currently busy
+- which jobs have failed or retried
+
+The scheduler logic still works without them. They are only there to make the system easier to observe while it is running.
 
 ### Why Redis Was a Good Fit Here
 
@@ -48,10 +58,9 @@ PostgreSQL still keeps the durable job record, so Redis is used for coordination
 Yes.
 
 - Kafka or NATS could carry jobs as messages instead of Redis lists.
-- Grafana and Prometheus could be added later for metrics and dashboards.
 - Redis Streams could also be a natural evolution if the project needed richer delivery semantics.
 
-For this assignment, I preferred a smaller design that is easier to explain and easier to verify.
+For this assignment, I preferred a smaller core design and then layered observability on top of it.
 
 ### Why I Used SQLite in Unit Tests
 

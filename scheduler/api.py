@@ -5,6 +5,7 @@ from datetime import datetime, UTC
 import time
 from typing import Dict, Any
 from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -15,6 +16,7 @@ except ModuleNotFoundError:  # pragma: no cover - runtime dependency, not needed
 
 from scheduler.config import settings
 from scheduler.database import get_db, engine, Base
+from scheduler.metrics import CONTENT_TYPE_LATEST, metrics_supported, render_metrics
 from scheduler.models import Job
 from scheduler.redis_queue import (
     ZSET_RUNNING,
@@ -187,6 +189,13 @@ def create_job(job_in: JobCreate, db: Session = Depends(get_db)):
 @app.get("/jobs/{id}")
 def get_job(id: str, db: Session = Depends(get_db)):
     return get_job_or_404(id, db)
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics():
+    if not metrics_supported():
+        raise HTTPException(status_code=503, detail="Prometheus metrics are unavailable")
+    return Response(content=render_metrics(), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.post("/next-job")

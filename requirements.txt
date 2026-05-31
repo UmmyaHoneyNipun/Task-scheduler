@@ -8,3 +8,4 @@ pytest==9.0.3
 httpx==0.28.1
 psycopg2-binary==2.9.12
 redis==5.2.1
+prometheus-client==0.23.1

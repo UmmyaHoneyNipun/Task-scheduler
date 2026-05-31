@@ -28,6 +28,8 @@ This starts:
 - the API
 - three workers
 - the timeout sweeper
+- Prometheus
+- Grafana
 - the unit-test container
 
 ## Run the unit tests
@@ -38,7 +40,26 @@ pytest -q tests/test_scheduler.py
 
 ## Swagger UI
 
-[http://localhost:8001/docs](http://localhost:8001/docs)
+http://localhost:8001/docs
+
+## Metrics
+http://localhost:8001/metrics
+
+## Monitoring
+- Prometheus: http://localhost:9090
+- Grafana: http://localhost:3000
+
+Grafana login:
+- username: `admin`
+- password: `admin`
+
+The default dashboard includes:
+- pending jobs by priority
+- running jobs by worker
+- a table of workers and their current jobs
+- completed jobs
+- failed jobs
+- retried jobs
 
 ## Watch the logs
 
@@ -46,7 +67,7 @@ pytest -q tests/test_scheduler.py
 docker compose logs -f
 ```
 
-## Create Bulk Task
+## Create Bulk Job
 
 ```bash
 for i in $(seq 1 100); do
