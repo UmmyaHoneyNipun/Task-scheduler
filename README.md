@@ -45,3 +45,18 @@ pytest -q tests/test_scheduler.py
 ```bash
 docker compose logs -f
 ```
+
+## Create Bulk Task
+
+```bash
+for i in $(seq 1 100); do
+  curl -s -X POST http://localhost:8001/jobs \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"job_type\": \"sleep\",
+      \"payload\": {\"duration\": 5},
+      \"priority\": $(( (i % 10) + 1 )),
+      \"max_retries\": 1
+    }" > /dev/null
+done
+```
