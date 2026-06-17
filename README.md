@@ -1,4 +1,4 @@
-# OTEE Task Scheduler
+# Task Scheduler
 
 Simple distributed task scheduler built with FastAPI, PostgreSQL, Redis, and Docker Compose.
 

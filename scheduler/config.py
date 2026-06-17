@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    APP_NAME: str = "OTEE Task Scheduler"
+    APP_NAME: str = "Task Scheduler"
     ENV: str = "development"
     DATABASE_URL: str
     REDIS_URL: str = "redis://localhost:6379/0"

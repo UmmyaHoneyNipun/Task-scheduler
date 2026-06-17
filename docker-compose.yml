@@ -1,23 +1,25 @@
+name: task-scheduler
+
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: otee-postgres
+    container_name: task-scheduler-postgres
     ports:
       - "5433:5432"
     environment:
-      POSTGRES_USER: otee_admin
-      POSTGRES_PASSWORD: otee_password
+      POSTGRES_USER: scheduler_admin
+      POSTGRES_PASSWORD: scheduler_password
       POSTGRES_DB: task_scheduler
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U otee_admin -d task_scheduler"]
+      test: ["CMD-SHELL", "pg_isready -U scheduler_admin -d task_scheduler"]
       interval: 5s
       timeout: 5s
       retries: 5
   redis:
     image: redis:7-alpine
-    container_name: otee-redis
+    container_name: task-scheduler-redis
     ports:
       - "6379:6379"
     command: redis-server --appendonly yes
@@ -31,12 +33,12 @@ services:
 
   api:
     build: .
-    container_name: otee-scheduler-api
+    container_name: task-scheduler-api
     ports:
       - "8001:8000"
     environment:
       PYTHONUNBUFFERED: "1"
-      DATABASE_URL: postgresql://otee_admin:otee_password@postgres:5432/task_scheduler
+      DATABASE_URL: postgresql://scheduler_admin:scheduler_password@postgres:5432/task_scheduler
       REDIS_URL: redis://redis:6379/0
     depends_on:
       postgres:
@@ -46,12 +48,12 @@ services:
 
   worker-alpha:
     build: .
-    container_name: otee-worker-alpha
+    container_name: task-worker-alpha
     command: python -m scheduler.worker --api-url http://api:8000 --redis-url redis://redis:6379/0
     environment:
       PYTHONUNBUFFERED: "1"
       WORKER_ID: worker-alpha
-      DATABASE_URL: postgresql://otee_admin:otee_password@postgres:5432/task_scheduler
+      DATABASE_URL: postgresql://scheduler_admin:scheduler_password@postgres:5432/task_scheduler
       SCHEDULER_API_URL: http://api:8000
       REDIS_URL: redis://redis:6379/0
     depends_on:
@@ -62,12 +64,12 @@ services:
 
   worker-beta:
     build: .
-    container_name: otee-worker-beta
+    container_name: task-worker-beta
     command: python -m scheduler.worker --api-url http://api:8000 --redis-url redis://redis:6379/0
     environment:
       PYTHONUNBUFFERED: "1"
       WORKER_ID: worker-beta
-      DATABASE_URL: postgresql://otee_admin:otee_password@postgres:5432/task_scheduler
+      DATABASE_URL: postgresql://scheduler_admin:scheduler_password@postgres:5432/task_scheduler
       SCHEDULER_API_URL: http://api:8000
       REDIS_URL: redis://redis:6379/0
     depends_on:
@@ -78,12 +80,12 @@ services:
 
   worker-gamma:
     build: .
-    container_name: otee-worker-gamma
+    container_name: task-worker-gamma
     command: python -m scheduler.worker --api-url http://api:8000 --redis-url redis://redis:6379/0
     environment:
       PYTHONUNBUFFERED: "1"
       WORKER_ID: worker-gamma
-      DATABASE_URL: postgresql://otee_admin:otee_password@postgres:5432/task_scheduler
+      DATABASE_URL: postgresql://scheduler_admin:scheduler_password@postgres:5432/task_scheduler
       SCHEDULER_API_URL: http://api:8000
       REDIS_URL: redis://redis:6379/0
     depends_on:
@@ -94,11 +96,11 @@ services:
 
   sweeper:
     build: .
-    container_name: otee-scheduler-sweeper
+    container_name: task-scheduler-sweeper
     command: python -m scheduler.sweeper
     environment:
       PYTHONUNBUFFERED: "1"
-      DATABASE_URL: postgresql://otee_admin:otee_password@postgres:5432/task_scheduler
+      DATABASE_URL: postgresql://scheduler_admin:scheduler_password@postgres:5432/task_scheduler
       REDIS_URL: redis://redis:6379/0
     depends_on:
       redis:
@@ -110,7 +112,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.test
-    container_name: otee-scheduler-test
+    container_name: task-scheduler-test
     environment:
       PYTHONUNBUFFERED: "1"
       DATABASE_URL: sqlite:///./unit_test.db
@@ -118,7 +120,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v2.54.1
-    container_name: otee-prometheus
+    container_name: task-scheduler-prometheus
     ports:
       - "9090:9090"
     volumes:
@@ -129,7 +131,7 @@ services:
 
   grafana:
     image: grafana/grafana:11.1.0
-    container_name: otee-grafana
+    container_name: task-scheduler-grafana
     ports:
       - "3000:3000"
     environment:

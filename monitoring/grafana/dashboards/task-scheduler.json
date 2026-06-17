@@ -554,8 +554,8 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "OTEE Task Scheduler",
-  "uid": "otee-task-scheduler",
+  "title": "Task Scheduler",
+  "uid": "task-scheduler",
   "version": 1,
   "weekStart": ""
 }

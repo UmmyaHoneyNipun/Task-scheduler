@@ -3,7 +3,7 @@ global:
   evaluation_interval: 5s
 
 scrape_configs:
-  - job_name: "otee-scheduler-api"
+  - job_name: "task-scheduler-api"
     metrics_path: /metrics
     static_configs:
       - targets: ["api:8000"]
