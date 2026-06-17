@@ -1,31 +1,83 @@
-# OTEE Task Scheduler
+# Task Scheduler
 
-Simple distributed task scheduler built with FastAPI, PostgreSQL, and Docker Compose.
+Simple distributed task scheduler built with FastAPI, PostgreSQL, Redis, and Docker Compose.
 
 ## Current stack
 - Python
 - FastAPI
 - PostgreSQL
+- Redis
 - Docker Compose for local development
 
 ## What is in the project
 
-- An API for creating and managing scheduled tasks according to priority (1-10 where 10 means highest and 1 lowest)
-- Worker processes that claim and execute tasks
+- An API for creating and tracking scheduled jobs
+- Redis-backed worker queues with three worker processes
 - A timeout sweeper that requeues or fails stalled jobs
-- Unit tests for job creation, execution, and worker behavior
+- Unit tests for job creation, worker execution, and retry behavior
 
-## Swagger UI
-docker compose up -d --build
-http://localhost:8001/docs
+## Run the stack
+
+```bash
+docker compose up --build
+```
+
+This starts:
+- PostgreSQL
+- Redis
+- the API
+- three workers
+- the timeout sweeper
+- Prometheus
+- Grafana
+- the unit-test container
 
 ## Run the unit tests
+
+```bash
 pytest -q tests/test_scheduler.py
+```
 
-## Run the stack and unit tests together
-docker compose up --build
+## Swagger UI
 
-The `test` service runs the unit suite automatically as part of the default Compose stack.
+http://localhost:8001/docs
 
-## Watch the log
+## Metrics
+http://localhost:8001/metrics
+
+## Monitoring
+- Prometheus: http://localhost:9090
+- Grafana: http://localhost:3000
+
+Grafana login:
+- username: `admin`
+- password: `admin`
+
+The default dashboard includes:
+- pending jobs by priority
+- running jobs by worker
+- a table of workers and their current jobs
+- completed jobs
+- failed jobs
+- retried jobs
+
+## Watch the logs
+
+```bash
 docker compose logs -f
+```
+
+## Create Bulk Job
+
+```bash
+for i in $(seq 1 100); do
+  curl -s -X POST http://localhost:8001/jobs \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"job_type\": \"sleep\",
+      \"payload\": {\"duration\": 5},
+      \"priority\": $(( (i % 10) + 1 )),
+      \"max_retries\": 1
+    }" > /dev/null
+done
+```

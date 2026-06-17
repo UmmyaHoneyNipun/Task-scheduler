@@ -1,17 +1,17 @@
 FROM python:3.11-slim
-
+ 
 WORKDIR /app
-
+ 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
-
+ 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
+ 
 COPY scheduler/ ./scheduler/
 COPY tests/ ./tests/
 
-CMD ["pytest", "tests/test_scheduler.py", "-v"]
-
+# DATABASE_URL is injected by docker-compose at runtime.
+CMD ["pytest", "-q", "tests/test_scheduler.py"]
